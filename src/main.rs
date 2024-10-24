@@ -24,20 +24,59 @@ fn main() -> Result<()> {
 
                 let mut error_code: i16 = 0;
 
-                let request_api_key = msg.get_i16();
+                // https://kafka.apache.org/protocol.html#The_Messages_ApiVersions
+                let request_api_key = msg.get_i16(); // https://kafka.apache.org/protocol.html#protocol_api_keys
                 let request_api_version = msg.get_i16();
-                match request_api_version {
-                    0..=4 => {}
-                    _ => error_code = 35, // UNSUPPORTED_VERSION}
-                }
                 let correlation_id = msg.get_i32();
-                eprintln!("msg_size: {msg_size}, request_api_key: {request_api_key}, request_api_version: {request_api_version}, correlation_id: {correlation_id}");
+                /*
+                + client_id: A string identifying the client that sent the request.
+                + tagged_fields: Optional tagged fields
+                    This can be ignored for now, they're optional tagged fields used to introduce additional features over time
+                        (https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields).
+                    The value for this will always be a null byte in this challenge (i.e. no tagged fields are present)
+                */
 
-                let msg_size = 8;
+                if request_api_key == 18 {
+                    match request_api_version {
+                        0..=4 => {}
+                        _ => error_code = 35, // UNSUPPORTED_VERSION}
+                    }
+                }
+
+                /////////////////
+                // The APIVersions response uses the "v0" header format, while all other responses use the "v1" header format. (????)
+                // The response header format (v0) is 4 bytes long, and contains exactly one field: correlation_id
+                // The response header format (v1) contains an additional tag_buffer field.
+
+                let mut api_keys = BytesMut::new();
+                let num_api_keys = 1 + 1; // COMPACT_ARRAY: N+1, because null array is represented as 0, empty array (actual length of 0) is represented as 1
+                api_keys.put_i16(18); // api_key
+                api_keys.put_i16(0); // min_version
+                api_keys.put_i16(4); // max_version
+
                 let mut resp = BytesMut::new();
+                let msg_size = 0; // will be counted later
                 resp.put_i32(msg_size);
-                resp.put_i32(correlation_id);
-                resp.put_i16(error_code);
+
+                resp.put_i32(correlation_id); // HEADER 4 bytes
+                                              // BODY - ApiVersions Response (Version: 3)
+                resp.put_i16(error_code); // 2 bytes
+
+                if request_api_key == 18 {
+                    resp.put_u8(num_api_keys);
+                    resp.put(api_keys);
+                }
+                resp.put_u8(0); // _tagged_fields
+                resp.put_i32(0); // throttle_time_ms (4 bytes)
+                resp.put_u8(0); // _tagged_fields
+
+                let resp_size = resp.len() as i32;
+
+                let msg_size = resp
+                    .first_chunk_mut::<4>()
+                    .expect("message size element is present in response header");
+                *msg_size = (resp_size - 4).to_be_bytes();
+
                 stream.write_all(&resp)?
             }
             Err(e) => {
