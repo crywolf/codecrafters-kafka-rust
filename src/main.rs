@@ -22,8 +22,14 @@ fn main() -> Result<()> {
                 msg.resize(msg_size, 0);
                 stream.read_exact(&mut msg).context("read message data")?;
 
+                let mut error_code: i16 = 0;
+
                 let request_api_key = msg.get_i16();
                 let request_api_version = msg.get_i16();
+                match request_api_version {
+                    0..=4 => {}
+                    _ => error_code = 35, // UNSUPPORTED_VERSION}
+                }
                 let correlation_id = msg.get_i32();
                 eprintln!("msg_size: {msg_size}, request_api_key: {request_api_key}, request_api_version: {request_api_version}, correlation_id: {correlation_id}");
 
@@ -31,6 +37,7 @@ fn main() -> Result<()> {
                 let mut resp = BytesMut::new();
                 resp.put_i32(msg_size);
                 resp.put_i32(correlation_id);
+                resp.put_i16(error_code);
                 stream.write_all(&resp)?
             }
             Err(e) => {
