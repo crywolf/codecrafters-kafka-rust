@@ -65,7 +65,7 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
             break;
         }
 
-        let mut resp = ApiVersionsResponseV3::new(correlation_id, request_api_version);
+        let resp = ApiVersionsResponseV3::new(correlation_id, request_api_version);
         let resp_message = ResponseMessage::from_bytes(resp.as_bytes());
 
         stream

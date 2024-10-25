@@ -55,16 +55,25 @@ impl ApiVersionsResponseV3 {
             _ => error_code = ErrorCode::UnsupportedVersion,
         }
 
-        Self {
+        let mut resp = Self {
             header,
             error_code,
             api_keys_vec,
             throttle_time_ms: 0,
             bytes: BytesMut::new(),
-        }
+        };
+
+        resp.serialize();
+        resp
     }
 
-    pub fn as_bytes(&mut self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Fills the internal `bytes` field with byte representation of the response
+    // https://kafka.apache.org/protocol.html#The_Messages_ApiVersions
+    fn serialize(&mut self) {
         // HEADER v0
         self.bytes.put_i32(self.header.correlation_id);
 
@@ -86,7 +95,5 @@ impl ApiVersionsResponseV3 {
         self.bytes.put(api_keys);
         self.bytes.put_i32(self.throttle_time_ms);
         self.bytes.put_u8(0); // _tagged_fields
-
-        &self.bytes
     }
 }
