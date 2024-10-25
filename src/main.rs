@@ -5,6 +5,7 @@ use tokio::{
 
 use anyhow::{Context, Result};
 use bytes::{Buf, BufMut, BytesMut};
+use num_enum::IntoPrimitive;
 use tokio::net::TcpListener;
 
 #[tokio::main]
@@ -16,7 +17,6 @@ async fn main() -> Result<()> {
 
         tokio::spawn(async move {
             eprintln!("accepted new connection");
-
             handle_connection(stream).await.unwrap_or_else(|e| {
                 eprintln!("Error: {:?}", e);
             })
@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
 }
 
 pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
-    // peek into stream and try read msg size to check if connection is still open
+    // peek into the stream and try to read msg size to check if connection is still open
     while stream.peek(&mut [0; 4]).await.is_ok() {
         // connection is not closed
 
@@ -43,8 +43,6 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
             .await
             .context("read message data")?;
 
-        let mut error_code: i16 = 0;
-
         // https://kafka.apache.org/protocol.html#The_Messages_ApiVersions
         let request_api_key = msg.get_i16(); // https://kafka.apache.org/protocol.html#protocol_api_keys
         let request_api_version = msg.get_i16();
@@ -57,38 +55,48 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
             The value for this will always be a null byte in this challenge (i.e. no tagged fields are present)
         */
 
-        if request_api_key == 18 {
+        let mut error_code = ErrorCodes::None;
+
+        if request_api_key == ApiKeys::ApiVersions.into() {
             match request_api_version {
                 0..=4 => {}
-                _ => error_code = 35, // UNSUPPORTED_VERSION}
+                _ => error_code = ErrorCodes::UnsupportedVersion,
             }
+        } else {
+            eprintln!("Unsupported api key `{}`", request_api_key);
+            error_code = ErrorCodes::InvalidRequest;
         }
 
-        /////////////////
-        // The APIVersions response uses the "v0" header format, while all other responses use the "v1" header format. (????)
+        ////////////////////////////////
+        // RESPONSE
+        //
+        // The APIVersions response uses the "v0" header format, while all other responses use the "v1" header format.
         // The response header format (v0) is 4 bytes long, and contains exactly one field: correlation_id
         // The response header format (v1) contains an additional tag_buffer field.
+        // https://kafka.apache.org/protocol.html#protocol_messages
 
         let mut api_keys = BytesMut::new();
         let num_api_keys = 1 + 1; // COMPACT_ARRAY: N+1, because null array is represented as 0, empty array (actual length of 0) is represented as 1
-        api_keys.put_i16(18); // api_key
+        api_keys.put_i16(ApiKeys::ApiVersions.into()); // api_key
         api_keys.put_i16(0); // min_version
         api_keys.put_i16(4); // max_version
 
         let mut resp = BytesMut::new();
-        let msg_size = 0; // will be counted later
+        let msg_size = 0; // placeholder; will be counted later
         resp.put_i32(msg_size);
 
-        resp.put_i32(correlation_id); // HEADER 4 bytes
-                                      // BODY - ApiVersions Response (Version: 3)
-        resp.put_i16(error_code); // 2 bytes
+        // HEADER v0
+        resp.put_i32(correlation_id);
 
-        if request_api_key == 18 {
+        // BODY - ApiVersions Response (Version: 3)
+        resp.put_i16(error_code.into());
+
+        if request_api_key == ApiKeys::ApiVersions.into() {
             resp.put_u8(num_api_keys);
             resp.put(api_keys);
         }
         resp.put_u8(0); // _tagged_fields
-        resp.put_i32(0); // throttle_time_ms (4 bytes)
+        resp.put_i32(0); // throttle_time_ms
         resp.put_u8(0); // _tagged_fields
 
         let resp_size = resp.len() as i32;
@@ -102,4 +110,18 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(IntoPrimitive)]
+#[repr(i16)]
+enum ApiKeys {
+    ApiVersions = 18,
+}
+
+#[derive(IntoPrimitive)]
+#[repr(i16)]
+enum ErrorCodes {
+    None = 0,
+    UnsupportedVersion = 35,
+    InvalidRequest = 42,
 }
