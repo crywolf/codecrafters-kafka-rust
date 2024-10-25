@@ -1,7 +1,7 @@
 mod protocol;
 
 use protocol::response::ApiVersionsResponseV3;
-use protocol::ApiKey;
+use protocol::{ApiKey, ResponseMessage};
 
 use anyhow::{Context, Result};
 use bytes::{Buf, BytesMut};
@@ -66,8 +66,10 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
         }
 
         let mut resp = ApiVersionsResponseV3::new(correlation_id, request_api_version);
+        let resp_message = ResponseMessage::from_bytes(resp.as_bytes());
+
         stream
-            .write_all(resp.as_bytes())
+            .write_all(resp_message.as_bytes())
             .await
             .context("write response")?
     }

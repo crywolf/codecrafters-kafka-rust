@@ -65,9 +65,6 @@ impl ApiVersionsResponseV3 {
     }
 
     pub fn as_bytes(&mut self) -> &[u8] {
-        let msg_size = 0; // placeholder; will be counted later
-        self.bytes.put_i32(msg_size);
-
         // HEADER v0
         self.bytes.put_i32(self.header.correlation_id);
 
@@ -89,14 +86,6 @@ impl ApiVersionsResponseV3 {
         self.bytes.put(api_keys);
         self.bytes.put_i32(self.throttle_time_ms);
         self.bytes.put_u8(0); // _tagged_fields
-
-        let resp_size = self.bytes.len() as i32;
-
-        let msg_size = self
-            .bytes
-            .first_chunk_mut::<4>()
-            .expect("message size element is present in response header");
-        *msg_size = (resp_size - 4).to_be_bytes();
 
         &self.bytes
     }
