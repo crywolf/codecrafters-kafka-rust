@@ -21,6 +21,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.91"                                   # error handling
 bytes = "1.8.0"                                     # helps manage buffers
+hex = "0.4.3"
 num_enum = "0.7.3"
 #thiserror = "1.0.32"                                # error handling
 tokio = { version = "1.41.0", features = ["full"] } # async networking

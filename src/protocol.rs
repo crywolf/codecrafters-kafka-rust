@@ -1,10 +1,12 @@
+pub mod request;
 pub mod response;
+pub mod types;
 
 use bytes::{BufMut, BytesMut};
-use num_enum::IntoPrimitive;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 /// https://kafka.apache.org/protocol.html#protocol_api_keys
-#[derive(Clone, Copy, IntoPrimitive)]
+#[derive(Clone, Copy, IntoPrimitive, TryFromPrimitive)]
 #[repr(i16)]
 pub enum ApiKey {
     ApiVersions = 18,
@@ -16,6 +18,7 @@ pub enum ApiKey {
 #[repr(i16)]
 pub enum ErrorCode {
     None = 0,
+    UnknownTopicOrPartition = 3,
     UnsupportedVersion = 35,
     InvalidRequest = 42,
 }
@@ -28,13 +31,13 @@ pub struct ResponseMessage {
 
 impl ResponseMessage {
     /// Calculates the size of the source API response and prepends it to the response
-    pub fn from_bytes(source: &[u8]) -> Self {
-        let mut bytes = BytesMut::with_capacity(source.len() + 4);
+    pub fn from_bytes(src: &[u8]) -> Self {
+        let mut bytes = BytesMut::with_capacity(src.len() + 4);
 
         let msg_size = 0; // placeholder; will be counted later
         bytes.put_i32(msg_size);
 
-        bytes.extend_from_slice(source);
+        bytes.extend_from_slice(src);
 
         let resp_size = bytes.len() as i32 - 4;
 
@@ -48,4 +51,8 @@ impl ResponseMessage {
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
+}
+
+pub trait Response {
+    fn as_bytes(&self) -> &[u8];
 }

@@ -1,10 +1,10 @@
+mod logic;
 mod protocol;
 
-use protocol::response::ApiVersionsResponseV3;
-use protocol::{ApiKey, ResponseMessage};
+use protocol::{request, ApiKey, ResponseMessage};
 
 use anyhow::{Context, Result};
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use tokio::net::TcpListener;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -46,26 +46,23 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
             .await
             .context("read message data")?;
 
-        // https://kafka.apache.org/protocol.html#The_Messages_ApiVersions
-        // Request Header v2
-        let request_api_key = msg.get_i16(); // https://kafka.apache.org/protocol.html#protocol_api_keys
-        let request_api_version = msg.get_i16();
-        let correlation_id = msg.get_i32();
-        /*
-        + client_id: A string identifying the client that sent the request.
-        + tagged_fields: Optional tagged fields
-            This can be ignored for now, they're optional tagged fields used to introduce additional features over time
-                (https://cwiki.apache.org/confluence/display/KAFKA/KIP-482%3A+The+Kafka+Protocol+should+Support+Optional+Tagged+Fields).
-            The value for this will always be a null byte in this challenge (i.e. no tagged fields are present)
-        */
+        let mut msg = msg.freeze();
 
-        if request_api_key != ApiKey::ApiVersions.into() {
-            eprintln!("Unsupported api key `{}`", request_api_key);
-            // terminate the connection because I don't know what respose Kafka is supposed to return
-            break;
-        }
+        let header = request::HeaderV2::from_bytes(&mut msg.clone());
 
-        let resp = ApiVersionsResponseV3::new(correlation_id, request_api_version);
+        let request_api_key = header.request_api_key;
+        // https://kafka.apache.org/protocol.html#protocol_api_keys
+        let request_api_key = match ApiKey::try_from(request_api_key) {
+            Ok(key) => key,
+            Err(_) => {
+                eprintln!("Unsupported api key `{}`", request_api_key);
+                // terminate the connection because I don't know what respose Kafka is supposed to return
+                break;
+            }
+        };
+
+        let resp = logic::process(request_api_key, &mut msg).context("process request")?;
+
         let resp_message = ResponseMessage::from_bytes(resp.as_bytes());
 
         stream
