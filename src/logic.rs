@@ -14,13 +14,11 @@ pub fn process(request_api_key: ApiKey, msg: &mut Bytes) -> Result<Box<dyn Respo
         ApiKey::ApiVersions => {
             let req =
                 ApiVersionsRequest::from_bytes(msg).context("deserialize ApiVersionsRequest")?;
-
             let resp = req.process();
             Box::new(resp)
         }
         ApiKey::DescribeTopicPartitions => {
             let req = DescribeTopicPartitionsRequestV0::from_bytes(msg);
-
             let resp = req.process().context("process request")?;
             Box::new(resp)
         }

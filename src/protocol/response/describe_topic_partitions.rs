@@ -1,6 +1,9 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::protocol::{ErrorCode, Response};
+use crate::protocol::{
+    types::{self, *},
+    ErrorCode, Response,
+};
 
 use super::HeaderV1;
 
@@ -31,41 +34,12 @@ impl DescribeTopicPartitionsResponseV0 {
     /// Fills the internal `bytes` field with byte representation of the response
     // https://kafka.apache.org/protocol.html#The_Messages_DescribeTopicPartitions
     fn serialize(&mut self) {
-        // HEADER v1
-        self.bytes.put_i32(self.header.correlation_id);
-        self.bytes.put_u8(self.header.tag_buffer);
+        // HEADER
+        self.bytes.put(self.header.serialize());
 
         // BODY
         self.bytes.put_i32(self.throttle_time_ms);
-
-        // topics: COMPACT ARRAY
-        let mut topics = BytesMut::new();
-        for item in self.topics.iter() {
-            topics.put_i16(item.error_code.into());
-            // COMPACT_STRING
-            let len = item.name.len() as u8 + 1;
-            topics.put_u8(len);
-            topics.put(item.name.as_bytes());
-
-            topics.put(
-                hex::decode(item.topic_id.replace('-', ""))
-                    .expect("valid UUID string")
-                    .as_ref(),
-            );
-            topics.put_u8(item.is_internal.into());
-
-            // empty COMPACT_ARRAY
-            let num_partitions = item.partitions.len() as u8 + 1;
-            topics.put_u8(num_partitions);
-            topics.put_i32(item.topic_authorized_operations);
-            topics.put_u8(0); // tag buffer
-        }
-
-        // COMPACT_ARRAY: N+1, because null array is represented as 0, empty array (actual length of 0) is represented as 1
-        let num_topics = self.topics.len() as u8 + 1;
-        self.bytes.put_u8(num_topics);
-        self.bytes.put(topics);
-
+        self.bytes.put(CompactArray::serialize(&mut self.topics));
         self.bytes.put_u8(self.next_cursor);
         self.bytes.put_u8(0); // tag buffer
     }
@@ -86,4 +60,31 @@ pub struct Topic {
     pub topic_authorized_operations: i32, // A 4-byte integer (bitfield) representing the authorized operations for this topic.
 }
 
+impl types::Serialize for Topic {
+    fn serialize(&mut self) -> Bytes {
+        let mut b = BytesMut::new();
+        b.put_i16(self.error_code.into());
+        b.put(CompactString::serialize(&self.name));
+
+        b.put(
+            hex::decode(self.topic_id.replace('-', ""))
+                .expect("valid UUID string")
+                .as_ref(),
+        );
+        b.put_u8(self.is_internal.into());
+
+        b.put(CompactArray::serialize(&mut self.partitions));
+
+        b.put_i32(self.topic_authorized_operations);
+        b.put_u8(0); // tag buffer
+        b.freeze()
+    }
+}
+
 pub struct Partition;
+
+impl types::Serialize for Partition {
+    fn serialize(&mut self) -> Bytes {
+        Bytes::new()
+    }
+}

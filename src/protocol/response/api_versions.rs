@@ -1,14 +1,11 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 
-use crate::protocol::{ApiKey, ErrorCode, Response};
+use crate::protocol::{
+    types::{self, CompactArray},
+    ApiKey, ErrorCode, Response,
+};
 
 use super::HeaderV0;
-
-pub struct ApiVersionsApiKeys {
-    pub api_key: ApiKey,
-    pub min_version: i16,
-    pub max_version: i16,
-}
 
 // The APIVersions response uses the "v0" header format, while all other responses use the "v1" header format.
 // The response header format (v0) is 4 bytes long, and contains exactly one field: correlation_id
@@ -62,31 +59,36 @@ impl ApiVersionsResponseV3 {
     // https://kafka.apache.org/protocol.html#The_Messages_ApiVersions
     fn serialize(&mut self) {
         // HEADER v0
-        self.bytes.put_i32(self.header.correlation_id);
+        self.bytes.put(self.header.serialize());
 
         // BODY - ApiVersions Response (Version: 3)
         self.bytes.put_i16(self.error_code.into());
-
-        let mut api_keys = BytesMut::new();
-        for item in self.api_keys_vec.iter() {
-            api_keys.put_i16(item.api_key.into());
-            api_keys.put_i16(item.min_version);
-            api_keys.put_i16(item.max_version);
-            api_keys.put_u8(0); // _tagged_fields
-        }
-
-        // COMPACT_ARRAY: N+1, because null array is represented as 0, empty array (actual length of 0) is represented as 1
-        let num_api_keys = self.api_keys_vec.len() as u8 + 1;
-
-        self.bytes.put_u8(num_api_keys);
-        self.bytes.put(api_keys);
+        self.bytes
+            .put(CompactArray::serialize(&mut self.api_keys_vec));
         self.bytes.put_i32(self.throttle_time_ms);
-        self.bytes.put_u8(0); // _tagged_fields
+        self.bytes.put_u8(0); // tag buffer
     }
 }
 
 impl Response for ApiVersionsResponseV3 {
     fn as_bytes(&self) -> &[u8] {
         &self.bytes
+    }
+}
+
+pub struct ApiVersionsApiKeys {
+    pub api_key: ApiKey,
+    pub min_version: i16,
+    pub max_version: i16,
+}
+
+impl types::Serialize for ApiVersionsApiKeys {
+    fn serialize(&mut self) -> Bytes {
+        let mut b = BytesMut::new();
+        b.put_i16(self.api_key.into());
+        b.put_i16(self.min_version);
+        b.put_i16(self.max_version);
+        b.put_u8(0); // tag buffer
+        b.freeze()
     }
 }

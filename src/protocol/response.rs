@@ -1,3 +1,5 @@
+use bytes::{BufMut, Bytes, BytesMut};
+
 pub mod api_versions;
 pub mod describe_topic_partitions;
 
@@ -8,17 +10,27 @@ pub mod describe_topic_partitions;
 
 struct HeaderV0 {
     correlation_id: i32,
+    bytes: Bytes,
 }
 
 impl HeaderV0 {
     fn new(correlation_id: i32) -> Self {
-        Self { correlation_id }
+        Self {
+            correlation_id,
+            bytes: Bytes::new(),
+        }
+    }
+
+    fn serialize(&mut self) -> &[u8] {
+        self.bytes = Bytes::copy_from_slice(self.correlation_id.to_be_bytes().as_slice());
+        &self.bytes
     }
 }
 
 struct HeaderV1 {
     correlation_id: i32,
     tag_buffer: u8,
+    bytes: BytesMut,
 }
 
 impl HeaderV1 {
@@ -26,6 +38,13 @@ impl HeaderV1 {
         Self {
             correlation_id,
             tag_buffer: 0, // tag buffer - An empty tagged field array, represented by a single byte of value 0x00.
+            bytes: BytesMut::new(),
         }
+    }
+
+    fn serialize(&mut self) -> &[u8] {
+        self.bytes.put_i32(self.correlation_id);
+        self.bytes.put_u8(self.tag_buffer);
+        &self.bytes
     }
 }

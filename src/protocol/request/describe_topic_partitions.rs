@@ -3,6 +3,7 @@ use bytes::{Buf, Bytes};
 
 use crate::protocol::{
     response::describe_topic_partitions::{DescribeTopicPartitionsResponseV0, Topic},
+    types::{CompactArray, CompactString},
     ErrorCode,
 };
 
@@ -22,22 +23,7 @@ impl DescribeTopicPartitionsRequestV0 {
     pub fn from_bytes(src: &mut Bytes) -> Self {
         let header = HeaderV2::from_bytes(src);
 
-        // topics: COMPACT ARRAY
-        let len = src.get_i8(); // array length + 1
-        let topics_len = if len > 1 { len as usize - 1 } else { 0 };
-
-        let mut topics = Vec::with_capacity(topics_len);
-        for _ in 0..topics_len {
-            // COMPACT STRING
-            let len = src.get_i8(); // string length + 1
-            let string_len = if len > 1 { len as usize - 1 } else { 0 };
-            let tn = src.slice(..string_len);
-            let topic_name = String::from_utf8_lossy(&tn);
-            topics.push(topic_name.into_owned());
-            src.advance(string_len);
-            _ = src.get_u8(); // tag buffer
-        }
-
+        let topics = CompactArray::deserialize::<_, CompactString>(src);
         let response_partition_limit = src.get_i32();
         let cursor = src.get_u8(); // A nullable field that can be used for pagination. Here, it is 0xff, indicating a null value
         _ = src.get_u8(); // tag buffer
