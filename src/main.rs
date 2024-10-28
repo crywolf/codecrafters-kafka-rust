@@ -1,7 +1,8 @@
 mod logic;
 mod protocol;
 
-use protocol::{request, ApiKey, ResponseMessage};
+use logic::UnsupportedApiKeyError;
+use protocol::{request, ResponseMessage};
 
 use anyhow::{Context, Result};
 use bytes::BytesMut;
@@ -49,19 +50,22 @@ pub async fn handle_connection(mut stream: TcpStream) -> Result<()> {
         let mut msg = msg.freeze();
 
         let header = request::HeaderV2::from_bytes(&mut msg.clone());
-
         let request_api_key = header.request_api_key;
-        // https://kafka.apache.org/protocol.html#protocol_api_keys
-        let request_api_key = match ApiKey::try_from(request_api_key) {
-            Ok(key) => key,
-            Err(_) => {
-                eprintln!("Unsupported api key `{}`", request_api_key);
-                // terminate the connection because I don't know what respose Kafka is supposed to return
-                break;
-            }
-        };
 
-        let resp = logic::process(request_api_key, &mut msg).context("process request")?;
+        let resp = match logic::process(request_api_key, &mut msg).context("process request") {
+            Ok(resp) => resp,
+            Err(err) => match err.downcast_ref::<UnsupportedApiKeyError>() {
+                Some(e) => {
+                    // I could create a specific error response here but I just print the error
+                    // and terminate the connection because I don't know what respose Kafka is supposed to return
+                    {
+                        eprintln!("Error: {e}");
+                        Err(err)
+                    }
+                }
+                None => Err(err),
+            }?,
+        };
 
         let resp_message = ResponseMessage::from_bytes(resp.as_bytes());
 
