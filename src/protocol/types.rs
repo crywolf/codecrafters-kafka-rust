@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 // https://kafka.apache.org/protocol.html#protocol_types
@@ -57,9 +55,9 @@ impl NullableString {
     }
 }
 
-// Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g. STRING) or a structure.
-// First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances of type T follow.
-// A null array is represented with a length of 0.
+/// Represents a sequence of objects of a given type T. Type T can be either a primitive type (e.g. STRING) or a structure.
+/// First, the length N + 1 is given as an UNSIGNED_VARINT. Then N instances of type T follow.
+/// A null array is represented with a length of 0.
 pub struct CompactArray;
 
 impl CompactArray {
@@ -117,7 +115,7 @@ impl Array {
 pub struct NullableBytes;
 
 impl NullableBytes {
-    pub fn deserialize<T: Debug, U: Deserialize<T>>(src: &mut Bytes) -> Vec<T> {
+    pub fn deserialize<T, U: Deserialize<T>>(src: &mut Bytes) -> Vec<T> {
         let len = src.get_i32();
         let items_len = if len == -1 { 0 } else { len as usize };
 

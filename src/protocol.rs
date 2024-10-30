@@ -9,6 +9,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 #[derive(Clone, Copy, IntoPrimitive, TryFromPrimitive)]
 #[repr(i16)]
 pub enum ApiKey {
+    Fetch = 1,
     ApiVersions = 18,
     DescribeTopicPartitions = 75,
 }

@@ -33,6 +33,7 @@ pub fn process(request_api_key: i16, msg: &mut Bytes) -> Result<Box<dyn Response
             let resp = topic_partitions::process(req)?;
             Box::new(resp)
         }
+        ApiKey::Fetch => todo!(),
     };
 
     Ok(response)

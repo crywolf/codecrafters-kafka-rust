@@ -35,6 +35,11 @@ impl ApiVersionsResponseV3 {
                 min_version: 0,
                 max_version: 0,
             },
+            ApiVersionsApiKeys {
+                api_key: ApiKey::Fetch,
+                min_version: 0,
+                max_version: 16,
+            },
         ];
 
         let mut error_code = ErrorCode::None;
