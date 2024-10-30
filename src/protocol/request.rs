@@ -3,6 +3,8 @@ pub mod describe_topic_partitions;
 
 use bytes::{Buf, Bytes};
 
+use super::types::NullableString;
+
 /// Request Header v2
 // https://kafka.apache.org/protocol.html#protocol_messages
 #[derive(Debug)]
@@ -19,12 +21,7 @@ impl HeaderV2 {
         let request_api_key = src.get_i16(); // https://kafka.apache.org/protocol.html#protocol_api_keys
         let request_api_version = src.get_i16();
         let correlation_id = src.get_i32();
-
-        // client_id: NULLABLE_STRING
-        let string_len = src.get_i16() as usize;
-        let client_id = src.slice(..string_len);
-        let client_id = String::from_utf8_lossy(&client_id).into_owned();
-        src.advance(string_len);
+        let client_id = NullableString::deserialize(src);
 
         /*
         + tagged_fields: Optional tagged fields

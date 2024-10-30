@@ -1,3 +1,5 @@
+pub mod topic_partitions;
+
 use anyhow::{bail, Context, Result};
 use bytes::Bytes;
 use thiserror::Error;
@@ -28,13 +30,14 @@ pub fn process(request_api_key: i16, msg: &mut Bytes) -> Result<Box<dyn Response
         }
         ApiKey::DescribeTopicPartitions => {
             let req = DescribeTopicPartitionsRequestV0::from_bytes(msg);
-            let resp = req.process().context("process request")?;
+            let resp = topic_partitions::process(req)?;
             Box::new(resp)
         }
     };
 
     Ok(response)
 }
+
 #[derive(Debug, Error)]
 #[error("Unsupported api key `{0}`")]
 pub struct UnsupportedApiKeyError(i16);

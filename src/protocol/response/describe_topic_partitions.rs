@@ -66,11 +66,7 @@ impl types::Serialize for Topic {
         b.put_i16(self.error_code.into());
         b.put(CompactString::serialize(&self.name));
 
-        b.put(
-            hex::decode(self.topic_id.replace('-', ""))
-                .expect("valid UUID string")
-                .as_ref(),
-        );
+        b.put(Uuid::serialize(&self.topic_id));
         b.put_u8(self.is_internal.into());
 
         b.put(CompactArray::serialize(&mut self.partitions));
@@ -81,10 +77,67 @@ impl types::Serialize for Topic {
     }
 }
 
-pub struct Partition;
+pub struct Partition {
+    error_code: ErrorCode,
+    partition_index: u32,
+    leader_id: u32,
+    leader_epoch: u32,
+    replicas: Vec<u32>,
+    in_sync_replicas: Vec<u32>,
+    eligible_leader_replicas: Vec<u32>,
+    last_known_eligible_leader_replicas: Vec<u32>,
+    off_line_replicas: Vec<u32>,
+}
+
+impl Partition {
+    pub fn new(
+        error_code: ErrorCode,
+        partition_index: u32,
+        leader_id: u32,
+        leader_epoch: u32,
+        replicas: Vec<u32>,
+        in_sync_replicas: Vec<u32>,
+        eligible_leader_replicas: Vec<u32>,
+        last_known_eligible_leader_replicas: Vec<u32>,
+        off_line_replicas: Vec<u32>,
+    ) -> Self {
+        Self {
+            error_code,
+            partition_index,
+            leader_id,
+            leader_epoch,
+            replicas,
+            in_sync_replicas,
+            eligible_leader_replicas,
+            last_known_eligible_leader_replicas,
+            off_line_replicas,
+        }
+    }
+}
 
 impl types::Serialize for Partition {
     fn serialize(&mut self) -> Bytes {
-        Bytes::new()
+        let mut b = BytesMut::new();
+        b.put_i16(self.error_code.into());
+        b.put_u32(self.partition_index);
+        b.put_u32(self.leader_id);
+        b.put_u32(self.leader_epoch);
+        b.put(CompactArray::serialize(&mut self.replicas));
+        b.put(CompactArray::serialize(&mut self.in_sync_replicas));
+        b.put(CompactArray::serialize(&mut self.eligible_leader_replicas));
+        b.put(CompactArray::serialize(
+            &mut self.last_known_eligible_leader_replicas,
+        ));
+        b.put(CompactArray::serialize(&mut self.off_line_replicas));
+        b.put_u8(0); // tag buffer
+        b.freeze()
+    }
+}
+
+impl types::Serialize for u32 {
+    fn serialize(&mut self) -> Bytes {
+        let mut b = BytesMut::with_capacity(4);
+        b.extend_from_slice(&self.to_be_bytes());
+        b.freeze()
     }
 }
