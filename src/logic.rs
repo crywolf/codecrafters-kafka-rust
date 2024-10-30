@@ -7,7 +7,7 @@ use thiserror::Error;
 use crate::protocol::{
     request::{
         api_versions::ApiVersionsRequest,
-        describe_topic_partitions::DescribeTopicPartitionsRequestV0,
+        describe_topic_partitions::DescribeTopicPartitionsRequestV0, fetch::FetchRequestV16,
     },
     ApiKey, Response,
 };
@@ -33,7 +33,11 @@ pub fn process(request_api_key: i16, msg: &mut Bytes) -> Result<Box<dyn Response
             let resp = topic_partitions::process(req)?;
             Box::new(resp)
         }
-        ApiKey::Fetch => todo!(),
+        ApiKey::Fetch => {
+            let req = FetchRequestV16::from_bytes(msg);
+            let resp = req.process();
+            Box::new(resp)
+        }
     };
 
     Ok(response)

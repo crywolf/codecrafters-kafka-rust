@@ -2,6 +2,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 pub mod api_versions;
 pub mod describe_topic_partitions;
+pub mod fetch;
 
 // The APIVersions response uses the "v0" header format, while all other responses use the "v1" header format.
 // The response header format (v0) is 4 bytes long, and contains exactly one field: correlation_id

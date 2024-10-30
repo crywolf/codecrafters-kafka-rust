@@ -3,7 +3,6 @@ use bytes::{Buf, Bytes};
 use super::HeaderV2;
 use crate::protocol::types::{self, CompactArray, CompactString};
 
-#[derive(Debug)]
 #[allow(dead_code)]
 pub struct DescribeTopicPartitionsRequestV0 {
     pub header: HeaderV2,
