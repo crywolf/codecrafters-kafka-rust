@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use bytes::{Buf, Bytes, BytesMut};
 
 use crate::protocol::{
@@ -7,6 +7,8 @@ use crate::protocol::{
     types::{self, CompactArray, CompactNullableBytes, CompactString, NullableBytes, Uuid, VarInt},
     ErrorCode,
 };
+
+const DEFAULT_UNKNOWN_TOPIC_UUID: &str = "00000000-0000-0000-0000-000000000000";
 
 /// https://kafka.apache.org/documentation/#log
 const CLUSTER_METADATA_LOG_FILE: &str =
@@ -19,51 +21,10 @@ pub fn process(req: DescribeTopicPartitionsRequestV0) -> Result<DescribeTopicPar
     data.extend_from_slice(&file_bytes);
     let mut data = data.freeze();
 
-    // TODO more topics
-    let topic_name = req.topics.first().ok_or(anyhow!("missing topic name"))?;
-
     // default response UUID
-    // Unknown topic UUID: 00000000-0000-0000-0000-000000000000
-    let mut topic_id = "00000000-0000-0000-0000-000000000000".to_string();
+    let mut topic_id = DEFAULT_UNKNOWN_TOPIC_UUID.to_string();
     // default error response
-    let mut error_code = ErrorCode::UnknownTopicOrPartition;
-    // deafult parititons response
-    let mut partitions = Vec::new();
-
-    while data.remaining() > 0 {
-        let record_batch = RecordBatch::from_bytes(&mut data);
-
-        // find topic id and partition info in the records
-        for rec in record_batch.records {
-            let rec_type = rec.value;
-            if let Some(id) = match rec_type {
-                RecordValue::Topic(ref topic) if topic.topic_name == *topic_name => {
-                    Some(topic.topic_id.clone())
-                }
-                _ => None,
-            } {
-                topic_id = id;
-                error_code = ErrorCode::None;
-            };
-
-            match rec_type {
-                RecordValue::Partition(p) if p.topic_id == topic_id => {
-                    partitions.push(Partition::new(
-                        ErrorCode::None,
-                        p.partition_id,
-                        p.leader_id,
-                        p.leader_epoch,
-                        p.replicas,
-                        p.in_sync_replicas,
-                        p.adding_replicas,
-                        Vec::new(),
-                        p.removing_replicas,
-                    ));
-                }
-                _ => {}
-            }
-        }
-    }
+    let mut topic_error_code = ErrorCode::UnknownTopicOrPartition;
 
     let topic_authorized_operations = 0x0DF;
     /*
@@ -81,15 +42,79 @@ pub fn process(req: DescribeTopicPartitionsRequestV0) -> Result<DescribeTopicPar
         https://github.com/apache/kafka/blob/1962917436f463541f9bb63791b7ed55c23ce8c1/clients/src/main/java/org/apache/kafka/common/acl/AclOperation.java#L44
     */
 
-    let topic = Topic {
-        error_code,
-        name: topic_name.to_string(),
-        topic_id,
-        is_internal: false,
-        partitions,
-        topic_authorized_operations,
-    };
-    let topics = vec![topic];
+    let mut topics = Vec::new();
+
+    while data.remaining() > 0 {
+        let record_batch = RecordBatch::from_bytes(&mut data);
+
+        for topic_name in &req.topics {
+            topic_id = DEFAULT_UNKNOWN_TOPIC_UUID.to_string();
+            let mut partitions = Vec::new();
+
+            // find topic id and partition info in the records
+            for rec in &record_batch.records {
+                let record_type = &rec.value;
+                if let Some(id) = match record_type {
+                    RecordValue::Topic(ref topic) if topic.topic_name == *topic_name => {
+                        Some(topic.topic_id.clone())
+                    }
+                    _ => None,
+                } {
+                    topic_id = id;
+                    topic_error_code = ErrorCode::None;
+                };
+
+                match record_type {
+                    RecordValue::Partition(p) if p.topic_id == topic_id => {
+                        partitions.push(Partition::new(
+                            ErrorCode::None,
+                            p.partition_id,
+                            p.leader_id,
+                            p.leader_epoch,
+                            p.replicas.clone(),
+                            p.in_sync_replicas.clone(),
+                            p.adding_replicas.clone(),
+                            Vec::new(),
+                            p.removing_replicas.clone(),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            if !partitions.is_empty() {
+                let topic = Topic {
+                    error_code: topic_error_code,
+                    name: topic_name.to_string(),
+                    topic_id: topic_id.clone(),
+                    is_internal: false,
+                    partitions,
+                    topic_authorized_operations,
+                };
+                topics.push(topic);
+            }
+        }
+    }
+
+    for requested_topic in req.topics {
+        let mut topic_found = false;
+        for topic in &topics {
+            if topic.name == requested_topic {
+                topic_found = true;
+            }
+        }
+        if !topic_found {
+            let error_topic = Topic {
+                error_code: ErrorCode::UnknownTopicOrPartition,
+                name: requested_topic.to_string(),
+                topic_id: topic_id.clone(),
+                is_internal: false,
+                partitions: Vec::new(),
+                topic_authorized_operations,
+            };
+            topics.push(error_topic);
+        }
+    }
 
     Ok(DescribeTopicPartitionsResponseV0::new(
         req.header.correlation_id,

@@ -1,7 +1,7 @@
 use bytes::{Buf, Bytes};
 
 use super::HeaderV2;
-use crate::protocol::types::{CompactArray, CompactString};
+use crate::protocol::types::{self, CompactArray, CompactString};
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -17,7 +17,7 @@ impl DescribeTopicPartitionsRequestV0 {
     pub fn from_bytes(src: &mut Bytes) -> Self {
         let header = HeaderV2::from_bytes(src);
 
-        let topics = CompactArray::deserialize::<_, CompactString>(src);
+        let topics = CompactArray::deserialize::<_, Topic>(src);
         let response_partition_limit = src.get_i32();
         let cursor = src.get_u8(); // A nullable field that can be used for pagination. Here, it is 0xff, indicating a null value
         _ = src.get_u8(); // tag buffer
@@ -28,5 +28,15 @@ impl DescribeTopicPartitionsRequestV0 {
             response_partition_limit,
             cursor,
         }
+    }
+}
+
+struct Topic;
+
+impl types::Deserialize<String> for Topic {
+    fn deserialize(src: &mut Bytes) -> String {
+        let s = CompactString::deserialize(src);
+        src.get_u8(); // tag buffer
+        s
     }
 }
