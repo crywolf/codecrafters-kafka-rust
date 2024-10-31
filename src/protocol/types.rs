@@ -114,7 +114,21 @@ impl Array {
 /// A null value is encoded with length of -1 and there are no following bytes.
 pub struct NullableBytes;
 
+#[allow(dead_code)]
 impl NullableBytes {
+    pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
+        let items_len = items.len();
+        let len = if items_len == 0 { -1 } else { items_len as i32 };
+
+        let mut b = BytesMut::new();
+        b.put_i32(len);
+        for item in items.iter_mut() {
+            b.put(item.serialize());
+        }
+
+        b.freeze()
+    }
+
     pub fn deserialize<T, U: Deserialize<T>>(src: &mut Bytes) -> Vec<T> {
         let len = src.get_i32();
         let items_len = if len == -1 { 0 } else { len as usize };
@@ -133,6 +147,18 @@ impl NullableBytes {
 pub struct CompactNullableBytes;
 
 impl CompactNullableBytes {
+    pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
+        let len = items.len() as u8 + 1; // should be varint
+
+        let mut b = BytesMut::new();
+        b.put_u8(len);
+        for item in items.iter_mut() {
+            b.put(item.serialize());
+        }
+
+        b.freeze()
+    }
+
     pub fn deserialize(src: &mut Bytes) -> Vec<u8> {
         let len = VarInt::deserialize(src);
         let bytes_len = if len > 1 { len as usize - 1 } else { 0 };

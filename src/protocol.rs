@@ -22,6 +22,7 @@ pub enum ErrorCode {
     UnknownTopicOrPartition = 3,
     UnsupportedVersion = 35,
     InvalidRequest = 42,
+    UnknownTopicId = 100,
 }
 
 /// Response Message is a wrapper around API response with prepended message size
