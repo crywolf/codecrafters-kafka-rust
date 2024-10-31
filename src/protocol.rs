@@ -2,7 +2,7 @@ pub mod request;
 pub mod response;
 pub mod types;
 
-use bytes::{BufMut, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 /// https://kafka.apache.org/protocol.html#protocol_api_keys
@@ -23,6 +23,15 @@ pub enum ErrorCode {
     UnsupportedVersion = 35,
     InvalidRequest = 42,
     UnknownTopicId = 100,
+}
+
+impl types::Serialize for ErrorCode {
+    fn serialize(&mut self) -> Bytes {
+        let mut b = BytesMut::with_capacity(2);
+        let val: i16 = <ErrorCode as Into<i16>>::into(*self);
+        b.put_i16(val);
+        b.freeze()
+    }
 }
 
 /// Response Message is a wrapper around API response with prepended message size

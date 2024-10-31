@@ -36,7 +36,6 @@ impl DescribeTopicPartitionsResponseV0 {
     fn serialize(&mut self) {
         // HEADER
         self.bytes.put(self.header.serialize());
-
         // BODY
         self.bytes.put_i32(self.throttle_time_ms);
         self.bytes.put(CompactArray::serialize(&mut self.topics));
@@ -63,16 +62,13 @@ pub struct Topic {
 impl types::Serialize for Topic {
     fn serialize(&mut self) -> Bytes {
         let mut b = BytesMut::new();
-        b.put_i16(self.error_code.into());
+        b.put(self.error_code.serialize());
         b.put(CompactString::serialize(&self.name));
-
         b.put(Uuid::serialize(&self.topic_id));
         b.put_u8(self.is_internal.into());
-
         b.put(CompactArray::serialize(&mut self.partitions));
-
         b.put_i32(self.topic_authorized_operations);
-        b.put_u8(0); // tag buffer
+        b.put(TaggedFields::serialize()); //
         b.freeze()
     }
 }
@@ -118,7 +114,7 @@ impl Partition {
 impl types::Serialize for Partition {
     fn serialize(&mut self) -> Bytes {
         let mut b = BytesMut::new();
-        b.put_i16(self.error_code.into());
+        b.put(self.error_code.serialize());
         b.put_u32(self.partition_index);
         b.put_u32(self.leader_id);
         b.put_u32(self.leader_epoch);
@@ -129,7 +125,7 @@ impl types::Serialize for Partition {
             &mut self.last_known_eligible_leader_replicas,
         ));
         b.put(CompactArray::serialize(&mut self.off_line_replicas));
-        b.put_u8(0); // tag buffer
+        b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
 }

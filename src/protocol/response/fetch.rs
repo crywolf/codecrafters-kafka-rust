@@ -2,7 +2,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::protocol::{
     self,
-    types::{self, CompactArray, CompactNullableBytes, Uuid},
+    types::{self, CompactArray, CompactNullableBytes, Serialize, TaggedFields, Uuid},
     ErrorCode,
 };
 
@@ -41,10 +41,10 @@ impl FetchResponseV16 {
         self.bytes.put(self.header.serialize());
         // BODY
         self.bytes.put_i32(self.throttle_time_ms);
-        self.bytes.put_i16(self.error_code.into());
+        self.bytes.put(self.error_code.serialize());
         self.bytes.put_u32(self.session_id);
         self.bytes.put(CompactArray::serialize(&mut self.responses));
-        self.bytes.put_u8(0); // tag buffer
+        self.bytes.put(TaggedFields::serialize()); // tag buffer
     }
 }
 
@@ -74,7 +74,7 @@ impl types::Serialize for TopicResponse {
         let mut b = BytesMut::new();
         b.put(Uuid::serialize(&self.topic_id));
         b.put(CompactArray::serialize(&mut self.partitions));
-        b.put_u8(0); // tag buffer
+        b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
 }
@@ -95,14 +95,14 @@ impl types::Serialize for TopicPartition {
     fn serialize(&mut self) -> Bytes {
         let mut b = BytesMut::new();
         b.put_u32(self.partition_index);
-        b.put_i16(self.error_code.into());
+        b.put(self.error_code.serialize());
         b.put_i64(self.high_watermark);
         b.put_i64(self.last_stable_offset);
         b.put_i64(self.log_start_offset);
         b.put(CompactArray::serialize(&mut self.aborted_transactions));
         b.put_i32(self.preferred_read_replica);
         b.put(CompactNullableBytes::serialize(&mut self.records));
-        b.put_u8(0); // tag buffer
+        b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
 }
@@ -115,7 +115,7 @@ pub struct AbortedTransaction {
 
 impl types::Serialize for AbortedTransaction {
     fn serialize(&mut self) -> Bytes {
-        //b.put_u8(0); // tag buffer
+        //b.put(TaggedFields::serialize()); // tag buffer
         todo!()
     }
 }

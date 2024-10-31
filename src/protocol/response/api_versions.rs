@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::protocol::{
-    types::{self, CompactArray},
+    types::{self, CompactArray, Serialize, TaggedFields},
     ApiKey, ErrorCode, Response,
 };
 
@@ -65,13 +65,12 @@ impl ApiVersionsResponseV3 {
     fn serialize(&mut self) {
         // HEADER v0
         self.bytes.put(self.header.serialize());
-
         // BODY - ApiVersions Response (Version: 3)
-        self.bytes.put_i16(self.error_code.into());
+        self.bytes.put(self.error_code.serialize());
         self.bytes
             .put(CompactArray::serialize(&mut self.api_keys_vec));
         self.bytes.put_i32(self.throttle_time_ms);
-        self.bytes.put_u8(0); // tag buffer
+        self.bytes.put(TaggedFields::serialize()); // tag buffer
     }
 }
 
@@ -93,7 +92,7 @@ impl types::Serialize for ApiVersionsApiKeys {
         b.put_i16(self.api_key.into());
         b.put_i16(self.min_version);
         b.put_i16(self.max_version);
-        b.put_u8(0); // tag buffer
+        b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
 }

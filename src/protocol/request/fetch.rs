@@ -4,7 +4,7 @@ use bytes::{Buf, Bytes};
 
 use crate::protocol::{
     response::fetch::{FetchResponseV16, TopicPartition, TopicResponse},
-    types::{self, CompactArray, CompactString, Uuid},
+    types::{self, CompactArray, CompactString, TaggedFields, Uuid},
     ErrorCode,
 };
 
@@ -46,7 +46,7 @@ impl FetchRequestV16 {
         let topics = CompactArray::deserialize::<TopicRequest, Self>(src);
         let forgotten_topics_data = CompactArray::deserialize::<ForgottenTopicData, Self>(src);
         let rack_id = CompactString::deserialize(src);
-        _ = src.get_u8(); // tag buffer
+        _ = TaggedFields::deserialize(src); // tag buffer
 
         Self {
             header,
@@ -105,7 +105,7 @@ impl types::Deserialize<TopicRequest> for FetchRequestV16 {
     fn deserialize(src: &mut Bytes) -> TopicRequest {
         let topic_id = Uuid::deserialize(src);
         let partitions = CompactArray::deserialize::<Partition, TopicRequest>(src);
-        _ = src.get_u8(); // tag buffer
+        _ = TaggedFields::deserialize(src); // tag buffer
         TopicRequest {
             topic_id,
             partitions,
@@ -126,7 +126,7 @@ impl types::Deserialize<ForgottenTopicData> for FetchRequestV16 {
             topic_id: Uuid::deserialize(src),
             partitions: CompactArray::deserialize::<u32, ForgottenTopicData>(src),
         };
-        _ = src.get_u8(); // tag buffer
+        _ = TaggedFields::deserialize(src); // tag buffer
         ftd
     }
 }
@@ -158,7 +158,7 @@ impl types::Deserialize<Partition> for TopicRequest {
             log_start_offset: src.get_u64(),
             partition_max_bytes: src.get_u32(),
         };
-        _ = src.get_u8(); // tag buffer
+        _ = TaggedFields::deserialize(src); // tag buffer
         p
     }
 }

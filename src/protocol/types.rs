@@ -190,6 +190,21 @@ impl Uuid {
     }
 }
 
+pub struct TaggedFields;
+
+impl TaggedFields {
+    // Tag buffer - In this challenge an empty tagged field array, represented by a single byte of value 0x00.
+    pub fn serialize() -> Bytes {
+        let mut b = BytesMut::with_capacity(1);
+        b.put_u8(0); // tag buffer
+        b.freeze()
+    }
+
+    pub fn deserialize(src: &mut Bytes) -> u8 {
+        src.get_u8() // tag buffer
+    }
+}
+
 /// https://protobuf.dev/programming-guides/encoding/#varints
 pub struct VarInt;
 
