@@ -146,6 +146,7 @@ impl NullableBytes {
 /// First the length N+1 is given as an UNSIGNED_VARINT. Then N bytes follow. A null object is represented with a length of 0.
 pub struct CompactNullableBytes;
 
+#[allow(dead_code)]
 impl CompactNullableBytes {
     pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
         let len = items.len() as u8 + 1; // should be varint

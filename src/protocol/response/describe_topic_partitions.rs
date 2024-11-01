@@ -86,6 +86,7 @@ pub struct Partition {
 }
 
 impl Partition {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         error_code: ErrorCode,
         partition_index: u32,

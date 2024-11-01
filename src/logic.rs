@@ -1,3 +1,4 @@
+pub mod fetch_responses;
 pub mod topic_partitions;
 
 use anyhow::{bail, Context, Result};
@@ -35,7 +36,7 @@ pub fn process(request_api_key: i16, msg: &mut Bytes) -> Result<Box<dyn Response
         }
         ApiKey::Fetch => {
             let req = FetchRequestV16::from_bytes(msg);
-            let resp = req.process();
+            let resp = fetch_responses::process(req)?;
             Box::new(resp)
         }
     };

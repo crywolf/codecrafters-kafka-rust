@@ -2,7 +2,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::protocol::{
     self,
-    types::{self, CompactArray, CompactNullableBytes, Serialize, TaggedFields, Uuid},
+    types::{self, CompactArray, Serialize, TaggedFields, Uuid},
     ErrorCode,
 };
 
@@ -88,7 +88,7 @@ pub struct TopicPartition {
     pub log_start_offset: i64,
     pub aborted_transactions: Vec<AbortedTransaction>,
     pub preferred_read_replica: i32,
-    pub records: Vec<Record>, // NULLABLE_BYTES
+    pub records: Vec<protocol::record_batch::Record>,
 }
 
 impl types::Serialize for TopicPartition {
@@ -101,7 +101,7 @@ impl types::Serialize for TopicPartition {
         b.put_i64(self.log_start_offset);
         b.put(CompactArray::serialize(&mut self.aborted_transactions));
         b.put_i32(self.preferred_read_replica);
-        b.put(CompactNullableBytes::serialize(&mut self.records));
+        b.put(CompactArray::serialize(&mut self.records));
         b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
@@ -115,15 +115,6 @@ pub struct AbortedTransaction {
 
 impl types::Serialize for AbortedTransaction {
     fn serialize(&mut self) -> Bytes {
-        //b.put(TaggedFields::serialize()); // tag buffer
         todo!()
-    }
-}
-
-pub struct Record;
-
-impl types::Serialize for Record {
-    fn serialize(&mut self) -> Bytes {
-        Bytes::new()
     }
 }

@@ -1,6 +1,7 @@
 pub mod request;
 pub mod response;
 pub mod types;
+pub mod record_batch;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
