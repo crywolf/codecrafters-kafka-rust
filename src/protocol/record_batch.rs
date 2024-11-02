@@ -1,11 +1,10 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use bytes::{Buf, Bytes, BytesMut};
-
-use crate::protocol::types::{CompactArray, CompactString, Uuid, VarInt};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use super::types::{self, CompactNullableBytes, NullableBytes};
+use crate::protocol::types::{CompactArray, CompactString, Uuid, VarInt};
 
 pub struct RecordBatches {
     batches: Vec<RecordBatch>,
@@ -31,22 +30,38 @@ impl RecordBatches {
         &self.batches
     }
 
-    pub fn batch_for_topic(&self, topic_id: &str) -> Option<&RecordBatch> {
+    pub fn raw_batch_for_topic(&self, topic_id: &str, partition_id: u32) -> Result<Option<Bytes>> {
+        let mut topic_name = String::new();
         self.batches.iter().find(|&b| {
-            let topic_found = b.records.iter().any(
-                |r| matches!(&r.value, RecordValue::Topic(topic) if topic.topic_id == topic_id),
-            );
-            topic_found
-        })
+            b.records.iter().any(|r| match &r.value {
+                RecordValue::Topic(topic) if topic.topic_id == topic_id => {
+                    topic_name = topic.topic_name.clone();
+                    true
+                }
+                _ => false,
+            })
+        });
+
+        if topic_name.is_empty() {
+            return Ok(None);
+        }
+
+        let file = format!(
+            "/tmp/kraft-combined-logs/{}-{}/00000000000000000000.log",
+            topic_name, partition_id
+        );
+        let file_bytes = std::fs::read(file).context("read file with messages")?;
+
+        Ok(Some(Bytes::from(file_bytes)))
     }
 }
 
 /// A record batch is the format that Kafka uses to store multiple records.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct RecordBatch {
     /// Base Offset is a 8-byte big-endian integer indicating the offset of the first record in this batch.
-    base_offset: i64,
+    pub base_offset: i64,
     /// Batch Length is a 4-byte big-endian integer indicating the length of the entire record batch in bytes.
     /// This value excludes the Base Offset (8 bytes) and the Batch Length (4 bytes) itself, but includes all other bytes in the record batch.
     batch_length: i32,
@@ -130,6 +145,25 @@ impl types::Deserialize<Record> for RecordBatch {
     }
 }
 
+impl types::Serialize for RecordBatch {
+    fn serialize(&mut self) -> Bytes {
+        let mut b = BytesMut::new();
+        b.put_i64(self.base_offset);
+        b.put_i32(self.batch_length);
+        b.put_i32(self.partition_leader_epoch);
+        b.put_i8(self.magic);
+        b.put_u32(self.crc);
+        b.put_i16(self.attributes);
+        b.put_i32(self.last_offset_delta);
+        b.put_i64(self.base_timestamp);
+        b.put_i64(self.max_timestamp);
+        b.put_i64(self.producer_id);
+        b.put_i16(self.producer_epoch);
+        b.put_i32(self.base_sequence);
+        b.freeze()
+    }
+}
+
 /// A record is the format that Kafka uses to store a single record.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -179,13 +213,6 @@ impl types::Deserialize<Header> for Record {
     fn deserialize(_src: &mut Bytes) -> Header {
         // we assume that headers array is empty, so this would not be called
         Header
-    }
-}
-
-impl types::Serialize for Record {
-    fn serialize(&mut self) -> Bytes {
-        // TODO
-        Bytes::new()
     }
 }
 

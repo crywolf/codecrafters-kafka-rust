@@ -104,7 +104,7 @@ impl types::Deserialize<u32> for ForgottenTopicData {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Partition {
-    partition: u32,
+    pub partition: u32,
     current_leader_epoch: u32,
     fetch_offset: u64,
     last_fetched_epoch: u32,

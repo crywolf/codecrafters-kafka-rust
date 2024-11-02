@@ -16,12 +16,10 @@ pub struct CompactString;
 
 impl CompactString {
     pub fn serialize(s: &str) -> Bytes {
-        let len = s.len() as u8 + 1;
-
         let mut b = BytesMut::new();
+        let len = s.len() as u8 + 1;
         b.put_u8(len);
         b.put(s.as_bytes());
-
         b.freeze()
     }
 
@@ -62,11 +60,11 @@ pub struct CompactArray;
 
 impl CompactArray {
     pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
+        let mut b = BytesMut::new();
         // COMPACT ARRAY: N+1, because null array is represented as 0, empty array (actual length of 0) is represented as 1
         let len = items.len() as u8 + 1;
-
-        let mut b = BytesMut::new();
         b.put_u8(len);
+
         for item in items.iter_mut() {
             b.put(item.serialize());
         }
@@ -116,16 +114,11 @@ pub struct NullableBytes;
 
 #[allow(dead_code)]
 impl NullableBytes {
-    pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
-        let items_len = items.len();
-        let len = if items_len == 0 { -1 } else { items_len as i32 };
-
+    pub fn serialize(bytes: &[u8]) -> Bytes {
         let mut b = BytesMut::new();
+        let len = bytes.len() as i32 + 1;
         b.put_i32(len);
-        for item in items.iter_mut() {
-            b.put(item.serialize());
-        }
-
+        b.put(bytes);
         b.freeze()
     }
 
@@ -148,22 +141,17 @@ pub struct CompactNullableBytes;
 
 #[allow(dead_code)]
 impl CompactNullableBytes {
-    pub fn serialize<T: Serialize>(items: &mut [T]) -> Bytes {
-        let len = items.len() as u8 + 1; // should be varint
-
+    pub fn serialize(bytes: &[u8]) -> Bytes {
         let mut b = BytesMut::new();
+        let len = bytes.len() as u8 + 1; // should be varint
         b.put_u8(len);
-        for item in items.iter_mut() {
-            b.put(item.serialize());
-        }
-
+        b.put(bytes);
         b.freeze()
     }
 
     pub fn deserialize(src: &mut Bytes) -> Vec<u8> {
         let len = VarInt::deserialize(src);
         let bytes_len = if len > 1 { len as usize - 1 } else { 0 };
-
         let bytes = src.slice(..bytes_len);
         src.advance(bytes_len);
         Vec::from(bytes)

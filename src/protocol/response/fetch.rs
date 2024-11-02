@@ -54,7 +54,6 @@ impl protocol::Response for FetchResponseV16 {
     }
 }
 
-#[allow(dead_code)]
 pub struct TopicResponse {
     topic_id: String, // UUID
     partitions: Vec<TopicPartition>,
@@ -79,7 +78,16 @@ impl types::Serialize for TopicResponse {
     }
 }
 
-#[allow(dead_code)]
+pub struct BatchBytes {
+    pub bytes: Bytes,
+}
+
+impl types::Serialize for BatchBytes {
+    fn serialize(&mut self) -> Bytes {
+        self.bytes.clone()
+    }
+}
+
 pub struct TopicPartition {
     pub partition_index: u32,
     pub error_code: ErrorCode,
@@ -88,7 +96,7 @@ pub struct TopicPartition {
     pub log_start_offset: i64,
     pub aborted_transactions: Vec<AbortedTransaction>,
     pub preferred_read_replica: i32,
-    pub records: Vec<protocol::record_batch::Record>,
+    pub record_batches: Vec<BatchBytes>,
 }
 
 impl types::Serialize for TopicPartition {
@@ -101,7 +109,7 @@ impl types::Serialize for TopicPartition {
         b.put_i64(self.log_start_offset);
         b.put(CompactArray::serialize(&mut self.aborted_transactions));
         b.put_i32(self.preferred_read_replica);
-        b.put(CompactArray::serialize(&mut self.records));
+        b.put(CompactArray::serialize(&mut self.record_batches));
         b.put(TaggedFields::serialize()); // tag buffer
         b.freeze()
     }
