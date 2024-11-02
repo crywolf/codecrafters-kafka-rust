@@ -4,9 +4,12 @@ This is a starting point for Rust solutions to the
 ["Build Your Own Kafka" Challenge](https://codecrafters.io/challenges/kafka).
 
 In this challenge, you'll build a toy Kafka clone that's capable of accepting
-and responding to APIVersions & Fetch API requests. You'll also learn about
+and responding to APIVersions, DescribeTopicPartitions & Fetch API requests. You'll also learn about
 encoding and decoding messages using the Kafka wire protocol. You'll also learn
 about handling the network protocol, event loops, TCP sockets and more.
+
+* [Kafka protocol guide](https://kafka.apache.org/protocol.html)
+* [Kafka documentation](https://kafka.apache.org/documentation/)
 
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
